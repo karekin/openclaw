@@ -5,6 +5,7 @@ import { resolveBrowserConfig, resolveProfile } from "./config.js";
 import { shouldRejectBrowserMutation } from "./csrf.js";
 import {
   ensureChromeExtensionRelayServer,
+  getChromeExtensionRelayConnectionStatus,
   stopChromeExtensionRelayServer,
 } from "./extension-relay.js";
 import { toBoolean } from "./routes/utils.js";
@@ -182,6 +183,25 @@ describe("cdp.helpers", () => {
       const headers = getHeadersWithAuth(`${cdpUrl}/json/version`);
       expect(headers["x-openclaw-relay-token"]).toBeTruthy();
       expect(headers["x-openclaw-relay-token"]).not.toBe("test-gateway-token");
+    } finally {
+      await stopChromeExtensionRelayServer({ cdpUrl }).catch(() => {});
+      if (prev === undefined) {
+        delete process.env.OPENCLAW_GATEWAY_TOKEN;
+      } else {
+        process.env.OPENCLAW_GATEWAY_TOKEN = prev;
+      }
+    }
+  });
+
+  it("reports extension relay connection state for known relay ports", async () => {
+    const port = await getFreePort();
+    const cdpUrl = `http://127.0.0.1:${port}`;
+    const prev = process.env.OPENCLAW_GATEWAY_TOKEN;
+    process.env.OPENCLAW_GATEWAY_TOKEN = "test-gateway-token";
+    try {
+      await ensureChromeExtensionRelayServer({ cdpUrl });
+      expect(getChromeExtensionRelayConnectionStatus(cdpUrl)).toBe(false);
+      expect(getChromeExtensionRelayConnectionStatus("http://127.0.0.1:19444")).toBeNull();
     } finally {
       await stopChromeExtensionRelayServer({ cdpUrl }).catch(() => {});
       if (prev === undefined) {

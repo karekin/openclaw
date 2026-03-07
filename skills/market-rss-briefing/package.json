@@ -1,0 +1,8 @@
+{
+  "name": "market-rss-briefing-skill",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "fast-xml-parser": "5.3.8"
+  }
+}

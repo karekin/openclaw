@@ -3,9 +3,11 @@ import { fetchBrowserJson } from "./client-fetch.js";
 export type BrowserStatus = {
   enabled: boolean;
   profile?: string;
+  driver?: "openclaw" | "extension";
   running: boolean;
   cdpReady?: boolean;
   cdpHttp?: boolean;
+  extensionConnected?: boolean | null;
   pid: number | null;
   cdpPort: number;
   cdpUrl?: string;
@@ -26,10 +28,12 @@ export type ProfileStatus = {
   cdpPort: number;
   cdpUrl: string;
   color: string;
+  driver: "openclaw" | "extension";
   running: boolean;
   tabCount: number;
   isDefault: boolean;
   isRemote: boolean;
+  extensionConnected?: boolean | null;
 };
 
 export type BrowserResetProfileResult = {

@@ -1,0 +1,20 @@
+{
+  "agents": {
+    "defaults": {
+      "memorySearch": {
+        "enabled": true,
+        "sources": ["memory"],
+        "sync": {
+          "onSessionStart": true,
+          "onSearch": true,
+          "watch": true
+        },
+        "query": {
+          "hybrid": {
+            "enabled": true
+          }
+        }
+      }
+    }
+  }
+}

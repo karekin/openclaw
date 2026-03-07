@@ -1,7 +1,8 @@
 import { SsrFBlockedError } from "../infra/net/ssrf.js";
-import { isChromeReachable, resolveOpenClawUserDataDir } from "./chrome.js";
+import { resolveOpenClawUserDataDir } from "./chrome.js";
 import type { ResolvedBrowserProfile } from "./config.js";
 import { resolveProfile } from "./config.js";
+import { getChromeExtensionRelayConnectionStatus } from "./extension-relay.js";
 import { InvalidBrowserNavigationUrlError } from "./navigation-guard.js";
 import {
   refreshResolvedBrowserConfigFromDisk,
@@ -151,7 +152,6 @@ export function createBrowserRouteContext(opts: ContextOptions): BrowserRouteCon
     const result: ProfileStatus[] = [];
 
     for (const name of Object.keys(current.resolved.profiles)) {
-      const profileState = current.profiles.get(name);
       const profile = resolveProfile(current.resolved, name);
       if (!profile) {
         continue;
@@ -159,29 +159,12 @@ export function createBrowserRouteContext(opts: ContextOptions): BrowserRouteCon
 
       let tabCount = 0;
       let running = false;
-
-      if (profileState?.running) {
+      const ctx = createProfileContext(opts, profile);
+      const cdpReady = await ctx.isReachable(200).catch(() => false);
+      if (cdpReady) {
         running = true;
-        try {
-          const ctx = createProfileContext(opts, profile);
-          const tabs = await ctx.listTabs();
-          tabCount = tabs.filter((t) => t.type === "page").length;
-        } catch {
-          // Browser might not be responsive
-        }
-      } else {
-        // Check if something is listening on the port
-        try {
-          const reachable = await isChromeReachable(profile.cdpUrl, 200);
-          if (reachable) {
-            running = true;
-            const ctx = createProfileContext(opts, profile);
-            const tabs = await ctx.listTabs().catch(() => []);
-            tabCount = tabs.filter((t) => t.type === "page").length;
-          }
-        } catch {
-          // Not reachable
-        }
+        const tabs = await ctx.listTabs().catch(() => []);
+        tabCount = tabs.filter((t) => t.type === "page").length;
       }
 
       result.push({
@@ -189,10 +172,14 @@ export function createBrowserRouteContext(opts: ContextOptions): BrowserRouteCon
         cdpPort: profile.cdpPort,
         cdpUrl: profile.cdpUrl,
         color: profile.color,
+        driver: profile.driver,
         running,
         tabCount,
         isDefault: name === current.resolved.defaultProfile,
         isRemote: !profile.cdpIsLoopback,
+        ...(profile.driver === "extension"
+          ? { extensionConnected: getChromeExtensionRelayConnectionStatus(profile.cdpUrl) }
+          : {}),
       });
     }
 

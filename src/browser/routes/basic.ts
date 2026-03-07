@@ -1,4 +1,5 @@
 import { resolveBrowserExecutableForPlatform } from "../chrome.executables.js";
+import { getChromeExtensionRelayConnectionStatus } from "../extension-relay.js";
 import { createBrowserProfilesService } from "../profiles-service.js";
 import type { BrowserRouteContext, ProfileContext } from "../server-context.js";
 import { resolveProfileContext } from "./agent.shared.js";
@@ -71,9 +72,13 @@ export function registerBrowserBasicRoutes(app: BrowserRouteRegistrar, ctx: Brow
     res.json({
       enabled: current.resolved.enabled,
       profile: profileCtx.profile.name,
+      driver: profileCtx.profile.driver,
       running: cdpReady,
       cdpReady,
       cdpHttp,
+      ...(profileCtx.profile.driver === "extension"
+        ? { extensionConnected: getChromeExtensionRelayConnectionStatus(profileCtx.profile.cdpUrl) }
+        : {}),
       pid: profileState?.running?.pid ?? null,
       cdpPort: profileCtx.profile.cdpPort,
       cdpUrl: profileCtx.profile.cdpUrl,

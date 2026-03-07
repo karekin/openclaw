@@ -1,0 +1,60 @@
+{
+  "notes": [
+    "Fed, SEC, ECB, CNBC, and MarketWatch are included as verified live examples.",
+    "SEC may require a descriptive User-Agent and Referer header; keep the headers block unless you replace the source."
+  ],
+  "windowHours": 24,
+  "feeds": [
+    {
+      "name": "Fed Press Releases",
+      "url": "https://www.federalreserve.gov/feeds/press_all.xml",
+      "bucket": "rates",
+      "assetClasses": ["rates", "macro"],
+      "sourceType": "official",
+      "eventTypes": ["policy", "liquidity"],
+      "priority": 5
+    },
+    {
+      "name": "SEC Press Releases",
+      "url": "https://www.sec.gov/rss/news/press.xml",
+      "bucket": "policy",
+      "assetClasses": ["equities", "bonds"],
+      "sourceType": "official",
+      "eventTypes": ["policy", "regulation"],
+      "priority": 4,
+      "headers": {
+        "user-agent": "OpenClaw Market Intel local@example.invalid",
+        "referer": "https://www.sec.gov/"
+      }
+    },
+    {
+      "name": "ECB Press Releases",
+      "url": "https://www.ecb.europa.eu/rss/press.xml",
+      "bucket": "rates",
+      "assetClasses": ["rates", "macro", "fx"],
+      "sourceType": "official",
+      "eventTypes": ["policy", "macro"],
+      "priority": 4
+    },
+    {
+      "name": "CNBC Top News",
+      "url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114",
+      "bucket": "macro",
+      "assetClasses": ["macro", "fx", "rates"],
+      "sourceType": "media",
+      "eventTypes": ["macro", "policy"],
+      "priority": 3,
+      "minimumKeywordHits": 1
+    },
+    {
+      "name": "MarketWatch Top Stories",
+      "url": "https://feeds.content.dowjones.io/public/rss/mw_topstories",
+      "bucket": "stocks-bonds",
+      "assetClasses": ["equities", "bonds", "macro"],
+      "sourceType": "media",
+      "eventTypes": ["macro", "market"],
+      "priority": 3,
+      "minimumKeywordHits": 1
+    }
+  ]
+}

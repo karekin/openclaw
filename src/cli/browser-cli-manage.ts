@@ -118,8 +118,17 @@ export function registerBrowserManageCommands(
         defaultRuntime.log(
           [
             `profile: ${status.profile ?? "openclaw"}`,
+            `driver: ${status.driver ?? "openclaw"}`,
             `enabled: ${status.enabled}`,
             `running: ${status.running}`,
+            ...(status.driver === "extension"
+              ? [
+                  `extensionConnected: ${status.extensionConnected === true}`,
+                  ...(status.extensionConnected === false
+                    ? ["hint: load the OpenClaw Chrome extension and click it on the target tab"]
+                    : []),
+                ]
+              : []),
             `cdpPort: ${status.cdpPort}`,
             `cdpUrl: ${status.cdpUrl ?? `http://127.0.0.1:${status.cdpPort}`}`,
             `browser: ${status.chosenBrowser ?? "unknown"}`,
@@ -407,7 +416,12 @@ export function registerBrowserManageCommands(
               const def = p.isDefault ? " [default]" : "";
               const loc = p.isRemote ? `cdpUrl: ${p.cdpUrl}` : `port: ${p.cdpPort}`;
               const remote = p.isRemote ? " [remote]" : "";
-              return `${p.name}: ${status}${tabs}${def}${remote}\n  ${loc}, color: ${p.color}`;
+              const driver = p.driver === "extension" ? " [extension]" : "";
+              const relay =
+                p.driver === "extension"
+                  ? `, attached: ${p.extensionConnected === true ? "yes" : "no"}`
+                  : "";
+              return `${p.name}: ${status}${tabs}${def}${remote}${driver}\n  ${loc}, color: ${p.color}${relay}`;
             })
             .join("\n"),
         );

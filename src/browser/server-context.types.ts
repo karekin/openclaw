@@ -52,10 +52,12 @@ export type ProfileStatus = {
   cdpPort: number;
   cdpUrl: string;
   color: string;
+  driver: "openclaw" | "extension";
   running: boolean;
   tabCount: number;
   isDefault: boolean;
   isRemote: boolean;
+  extensionConnected?: boolean | null;
 };
 
 export type ContextOptions = {

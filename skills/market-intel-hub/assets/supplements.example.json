@@ -1,0 +1,21 @@
+{
+  "items": [
+    {
+      "title": "PBOC liquidity operation update",
+      "url": "https://example.com/pboc-liquidity",
+      "source": "manual-scrape",
+      "sourceType": "official",
+      "bucket": "rates",
+      "assetClasses": ["rates", "macro"],
+      "eventTypes": ["policy", "liquidity"],
+      "publishedAt": "2026-03-07T08:30:00Z",
+      "summary": "Net liquidity injection with implications for front-end rates and risk appetite.",
+      "keywordHits": ["liquidity", "央行"],
+      "score": 50,
+      "notes": [
+        "Can be produced from playwright-scraper-skill output.",
+        "Can also hold normalized notes from tushare-finance or manual analyst research."
+      ]
+    }
+  ]
+}

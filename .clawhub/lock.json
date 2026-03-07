@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "skills": {
+    "rss-aggregator": {
+      "version": "1.0.2",
+      "installedAt": 1772863609016
+    },
+    "finnhub-pro": {
+      "version": "1.0.1",
+      "installedAt": 1772863609101
+    },
+    "playwright-scraper-skill": {
+      "version": "1.2.0",
+      "installedAt": 1772863609572
+    },
+    "tushare-finance": {
+      "version": "2.0.6",
+      "installedAt": 1772863619939
+    }
+  }
+}

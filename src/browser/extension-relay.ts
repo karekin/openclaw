@@ -221,6 +221,23 @@ export function getChromeExtensionRelayAuthHeaders(url: string): Record<string, 
   return { [RELAY_AUTH_HEADER]: token };
 }
 
+export function getChromeExtensionRelayConnectionStatus(url: string): boolean | null {
+  try {
+    const parsed = new URL(url);
+    if (!isLoopbackHost(parsed.hostname)) {
+      return null;
+    }
+    const port = parseUrlPort(parsed);
+    if (!port) {
+      return null;
+    }
+    const runtime = relayRuntimeByPort.get(port);
+    return runtime ? runtime.server.extensionConnected() : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function ensureChromeExtensionRelayServer(opts: {
   cdpUrl: string;
 }): Promise<ChromeExtensionRelayServer> {
