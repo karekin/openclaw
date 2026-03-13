@@ -2,6 +2,7 @@ import { SsrFBlockedError } from "../infra/net/ssrf.js";
 import { resolveOpenClawUserDataDir } from "./chrome.js";
 import type { ResolvedBrowserProfile } from "./config.js";
 import { resolveProfile } from "./config.js";
+import { BrowserProfileNotFoundError, toBrowserErrorResponse } from "./errors.js";
 import { getChromeExtensionRelayConnectionStatus } from "./extension-relay.js";
 import { InvalidBrowserNavigationUrlError } from "./navigation-guard.js";
 import {
@@ -58,7 +59,7 @@ function createProfileContext(
     const current = state();
     let profileState = current.profiles.get(profile.name);
     if (!profileState) {
-      profileState = { profile, running: null, lastTargetId: null };
+      profileState = { profile, running: null, lastTargetId: null, reconcile: null };
       current.profiles.set(profile.name, profileState);
     }
     return profileState;
@@ -137,7 +138,9 @@ export function createBrowserRouteContext(opts: ContextOptions): BrowserRouteCon
 
     if (!profile) {
       const available = Object.keys(current.resolved.profiles).join(", ");
-      throw new Error(`Profile "${name}" not found. Available profiles: ${available || "(none)"}`);
+      throw new BrowserProfileNotFoundError(
+        `Profile "${name}" not found. Available profiles: ${available || "(none)"}`,
+      );
     }
     return createProfileContext(opts, profile);
   };
@@ -151,8 +154,9 @@ export function createBrowserRouteContext(opts: ContextOptions): BrowserRouteCon
     });
     const result: ProfileStatus[] = [];
 
-    for (const name of Object.keys(current.resolved.profiles)) {
-      const profile = resolveProfile(current.resolved, name);
+    for (const name of listKnownProfileNames(current)) {
+      const profileState = current.profiles.get(name);
+      const profile = resolveProfile(current.resolved, name) ?? profileState?.profile;
       if (!profile) {
         continue;
       }
@@ -180,6 +184,8 @@ export function createBrowserRouteContext(opts: ContextOptions): BrowserRouteCon
         ...(profile.driver === "extension"
           ? { extensionConnected: getChromeExtensionRelayConnectionStatus(profile.cdpUrl) }
           : {}),
+        missingFromConfig: !(name in current.resolved.profiles) || undefined,
+        reconcileReason: profileState?.reconcile?.reason ?? null,
       });
     }
 
@@ -190,21 +196,15 @@ export function createBrowserRouteContext(opts: ContextOptions): BrowserRouteCon
   const getDefaultContext = () => forProfile();
 
   const mapTabError = (err: unknown) => {
+    const browserMapped = toBrowserErrorResponse(err);
+    if (browserMapped) {
+      return browserMapped;
+    }
     if (err instanceof SsrFBlockedError) {
       return { status: 400, message: err.message };
     }
     if (err instanceof InvalidBrowserNavigationUrlError) {
       return { status: 400, message: err.message };
-    }
-    const msg = String(err);
-    if (msg.includes("ambiguous target id prefix")) {
-      return { status: 409, message: "ambiguous target id prefix" };
-    }
-    if (msg.includes("tab not found")) {
-      return { status: 404, message: msg };
-    }
-    if (msg.includes("not found")) {
-      return { status: 404, message: msg };
     }
     return null;
   };

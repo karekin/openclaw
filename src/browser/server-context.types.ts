@@ -13,6 +13,10 @@ export type ProfileRuntimeState = {
   running: RunningChrome | null;
   /** Sticky tab selection when callers omit targetId (keeps snapshot+act consistent). */
   lastTargetId?: string | null;
+  reconcile?: {
+    previousProfile: ResolvedBrowserProfile;
+    reason: string;
+  } | null;
 };
 
 export type BrowserServerState = {
@@ -58,6 +62,8 @@ export type ProfileStatus = {
   isDefault: boolean;
   isRemote: boolean;
   extensionConnected?: boolean | null;
+  missingFromConfig?: boolean;
+  reconcileReason?: string | null;
 };
 
 export type ContextOptions = {
