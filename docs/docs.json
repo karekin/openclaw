@@ -943,6 +943,7 @@
                 "pages": [
                   "pi",
                   "concepts/architecture",
+                  "concepts/key-technologies",
                   "concepts/agent",
                   "concepts/agent-loop",
                   "concepts/system-prompt",
