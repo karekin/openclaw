@@ -4,6 +4,7 @@ import {
   estimateUsageCost,
   formatTokenCount,
   formatUsd,
+  hasConfiguredCostRates,
   resolveModelCostConfig,
 } from "./usage-format.js";
 
@@ -58,5 +59,28 @@ describe("usage-format", () => {
     });
 
     expect(total).toBeCloseTo(0.003);
+  });
+
+  it("treats all-zero cost tables as missing cost data", () => {
+    expect(
+      hasConfiguredCostRates({
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+      }),
+    ).toBe(false);
+
+    expect(
+      estimateUsageCost({
+        usage: { input: 1000, output: 500 },
+        cost: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+        },
+      }),
+    ).toBeUndefined();
   });
 });

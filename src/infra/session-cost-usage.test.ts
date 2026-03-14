@@ -110,6 +110,57 @@ describe("session cost usage", () => {
     });
   });
 
+  it("counts all-zero transcript costs as missing when no model prices are configured", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-cost-missing-"));
+    const sessionsDir = path.join(root, "agents", "main", "sessions");
+    await fs.mkdir(sessionsDir, { recursive: true });
+    const sessionFile = path.join(sessionsDir, "sess-1.jsonl");
+
+    const now = new Date();
+    await fs.writeFile(
+      sessionFile,
+      JSON.stringify({
+        type: "message",
+        timestamp: now.toISOString(),
+        message: {
+          role: "assistant",
+          provider: "moonshot",
+          model: "kimi-k2.5",
+          usage: {
+            input: 128,
+            output: 64,
+            cacheRead: 32,
+            totalTokens: 224,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+          },
+        },
+      }),
+      "utf-8",
+    );
+
+    const config = {
+      models: {
+        providers: {
+          moonshot: {
+            models: [
+              {
+                id: "kimi-k2.5",
+                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+              },
+            ],
+          },
+        },
+      },
+    } as unknown as OpenClawConfig;
+
+    await withStateDir(root, async () => {
+      const summary = await loadCostUsageSummary({ days: 30, config });
+      expect(summary.totals.totalTokens).toBe(224);
+      expect(summary.totals.totalCost).toBe(0);
+      expect(summary.totals.missingCostEntries).toBe(1);
+    });
+  });
+
   it("summarizes a single session file", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-cost-session-"));
     const sessionFile = path.join(root, "session.jsonl");

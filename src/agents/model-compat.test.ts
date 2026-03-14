@@ -181,6 +181,29 @@ describe("normalizeModelCompat", () => {
     });
   });
 
+  it("keeps supportsUsageInStreaming on for Moonshot endpoints", () => {
+    const model = {
+      ...baseModel(),
+      provider: "moonshot",
+      baseUrl: "https://api.moonshot.cn/v1",
+    };
+    delete (model as { compat?: unknown }).compat;
+    const normalized = normalizeModelCompat(model);
+    expect(supportsDeveloperRole(normalized)).toBe(false);
+    expect(supportsUsageInStreaming(normalized)).toBe(true);
+  });
+
+  it("respects explicit supportsUsageInStreaming false on Moonshot endpoints", () => {
+    const model = {
+      ...baseModel(),
+      provider: "moonshot",
+      baseUrl: "https://api.moonshot.ai/v1",
+      compat: { supportsUsageInStreaming: false },
+    };
+    const normalized = normalizeModelCompat(model);
+    expect(supportsUsageInStreaming(normalized)).toBe(false);
+  });
+
   it("forces supportsDeveloperRole off for DashScope provider ids", () => {
     expectSupportsDeveloperRoleForcedOff({
       provider: "dashscope",

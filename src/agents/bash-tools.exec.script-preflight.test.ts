@@ -9,6 +9,41 @@ const isWin = process.platform === "win32";
 const describeNonWin = isWin ? describe.skip : describe;
 
 describeNonWin("exec script preflight", () => {
+  it("blocks python inline eval commands that embed markdown code fences", async () => {
+    const tool = createExecTool({ host: "gateway", security: "full", ask: "off" });
+
+    await expect(
+      tool.execute("call-inline-python", {
+        command:
+          "python -c \"payload = '''```bash\\nopenclaw gateway stop\\n```'''\\nprint(payload)\"",
+      }),
+    ).rejects.toThrow(/exec preflight: blocked python -c command containing markdown code fences/);
+  });
+
+  it("blocks node inline eval commands that embed markdown code fences", async () => {
+    const tool = createExecTool({ host: "gateway", security: "full", ask: "off" });
+
+    await expect(
+      tool.execute("call-inline-node", {
+        command:
+          'node --eval "const payload = String.raw` ```bash\\nopenclaw gateway stop\\n``` `;"',
+      }),
+    ).rejects.toThrow(
+      /exec preflight: blocked node --eval command containing markdown code fences/,
+    );
+  });
+
+  it("allows inline eval commands without markdown code fences", async () => {
+    const tool = createExecTool({ host: "gateway", security: "full", ask: "off" });
+
+    const result = await tool.execute("call-inline-safe", {
+      command: "node -e \"console.log('safe-inline-eval')\"",
+    });
+    const text = result.content.find((block) => block.type === "text")?.text ?? "";
+    expect(text).toContain("safe-inline-eval");
+    expect(text).not.toMatch(/exec preflight:/);
+  });
+
   it("blocks shell env var injection tokens in python scripts before execution", async () => {
     await withTempDir("openclaw-exec-preflight-", async (tmp) => {
       const pyPath = path.join(tmp, "bad.py");

@@ -102,7 +102,7 @@ describe("loadSettings default gateway URL derivation", () => {
     expect(loadSettings().gatewayUrl).toBe(expectedGatewayUrl("/apps/openclaw"));
   });
 
-  it("ignores and scrubs legacy persisted tokens", async () => {
+  it("migrates legacy session tokens into persisted per-gateway tokens", async () => {
     setTestLocation({
       protocol: "https:",
       host: "gateway.example:8443",
@@ -121,7 +121,7 @@ describe("loadSettings default gateway URL derivation", () => {
     const { loadSettings } = await import("./storage.ts");
     expect(loadSettings()).toMatchObject({
       gatewayUrl: "wss://gateway.example:8443/openclaw",
-      token: "",
+      token: "legacy-session-token",
       sessionKey: "agent",
     });
     expect(JSON.parse(localStorage.getItem("openclaw.control.settings.v1") ?? "{}")).toEqual({
@@ -138,9 +138,14 @@ describe("loadSettings default gateway URL derivation", () => {
       navGroupsCollapsed: {},
     });
     expect(sessionStorage.length).toBe(0);
+    expect(
+      localStorage.getItem(
+        "openclaw.control.token.persisted.v1:wss://gateway.example:8443/openclaw",
+      ),
+    ).toBe("legacy-session-token");
   });
 
-  it("loads the current-tab token from sessionStorage", async () => {
+  it("loads the persisted token from localStorage", async () => {
     setTestLocation({
       protocol: "https:",
       host: "gateway.example:8443",
@@ -150,7 +155,7 @@ describe("loadSettings default gateway URL derivation", () => {
     const { loadSettings, saveSettings } = await import("./storage.ts");
     saveSettings({
       gatewayUrl: "wss://gateway.example:8443/openclaw",
-      token: "session-token",
+      token: "persisted-token",
       sessionKey: "main",
       lastActiveSessionKey: "main",
       theme: "claw",
@@ -165,7 +170,7 @@ describe("loadSettings default gateway URL derivation", () => {
 
     expect(loadSettings()).toMatchObject({
       gatewayUrl: "wss://gateway.example:8443/openclaw",
-      token: "session-token",
+      token: "persisted-token",
     });
   });
 
@@ -215,7 +220,7 @@ describe("loadSettings default gateway URL derivation", () => {
     });
   });
 
-  it("does not persist gateway tokens when saving settings", async () => {
+  it("persists gateway tokens per gatewayUrl when saving settings", async () => {
     setTestLocation({
       protocol: "https:",
       host: "gateway.example:8443",
@@ -225,7 +230,7 @@ describe("loadSettings default gateway URL derivation", () => {
     const { loadSettings, saveSettings } = await import("./storage.ts");
     saveSettings({
       gatewayUrl: "wss://gateway.example:8443/openclaw",
-      token: "memory-only-token",
+      token: "persisted-token",
       sessionKey: "main",
       lastActiveSessionKey: "main",
       theme: "claw",
@@ -239,7 +244,7 @@ describe("loadSettings default gateway URL derivation", () => {
     });
     expect(loadSettings()).toMatchObject({
       gatewayUrl: "wss://gateway.example:8443/openclaw",
-      token: "memory-only-token",
+      token: "persisted-token",
     });
 
     expect(JSON.parse(localStorage.getItem("openclaw.control.settings.v1") ?? "{}")).toEqual({
@@ -255,7 +260,12 @@ describe("loadSettings default gateway URL derivation", () => {
       navWidth: 220,
       navGroupsCollapsed: {},
     });
-    expect(sessionStorage.length).toBe(1);
+    expect(
+      localStorage.getItem(
+        "openclaw.control.token.persisted.v1:wss://gateway.example:8443/openclaw",
+      ),
+    ).toBe("persisted-token");
+    expect(sessionStorage.length).toBe(0);
   });
 
   it("clears the current-tab token when saving an empty token", async () => {
@@ -296,6 +306,11 @@ describe("loadSettings default gateway URL derivation", () => {
     });
 
     expect(loadSettings().token).toBe("");
+    expect(
+      localStorage.getItem(
+        "openclaw.control.token.persisted.v1:wss://gateway.example:8443/openclaw",
+      ),
+    ).toBeNull();
     expect(sessionStorage.length).toBe(0);
   });
 

@@ -1,6 +1,7 @@
 const KEY = "openclaw.control.settings.v1";
 const LEGACY_TOKEN_SESSION_KEY = "openclaw.control.token.v1";
 const TOKEN_SESSION_KEY_PREFIX = "openclaw.control.token.v1:";
+const TOKEN_LOCAL_KEY_PREFIX = "openclaw.control.token.persisted.v1:";
 
 type PersistedUiSettings = Omit<UiSettings, "token"> & { token?: never };
 
@@ -53,16 +54,6 @@ function deriveDefaultGatewayUrl(): { pageUrl: string; effectiveUrl: string } {
   return { pageUrl, effectiveUrl };
 }
 
-function getSessionStorage(): Storage | null {
-  if (typeof window !== "undefined" && window.sessionStorage) {
-    return window.sessionStorage;
-  }
-  if (typeof sessionStorage !== "undefined") {
-    return sessionStorage;
-  }
-  return null;
-}
-
 function normalizeGatewayTokenScope(gatewayUrl: string): string {
   const trimmed = gatewayUrl.trim();
   if (!trimmed) {
@@ -86,34 +77,65 @@ function tokenSessionKeyForGateway(gatewayUrl: string): string {
   return `${TOKEN_SESSION_KEY_PREFIX}${normalizeGatewayTokenScope(gatewayUrl)}`;
 }
 
-function loadSessionToken(gatewayUrl: string): string {
+function tokenLocalKeyForGateway(gatewayUrl: string): string {
+  return `${TOKEN_LOCAL_KEY_PREFIX}${normalizeGatewayTokenScope(gatewayUrl)}`;
+}
+
+function getSessionStorage(): Storage | null {
+  if (typeof window !== "undefined" && window.sessionStorage) {
+    return window.sessionStorage;
+  }
+  if (typeof sessionStorage !== "undefined") {
+    return sessionStorage;
+  }
+  return null;
+}
+
+function loadStoredToken(gatewayUrl: string): string {
   try {
-    const storage = getSessionStorage();
-    if (!storage) {
+    const sessionStorage = getSessionStorage();
+    const localToken = localStorage.getItem(tokenLocalKeyForGateway(gatewayUrl)) ?? "";
+    if (localToken.trim()) {
+      if (sessionStorage) {
+        sessionStorage.removeItem(LEGACY_TOKEN_SESSION_KEY);
+        sessionStorage.removeItem(tokenSessionKeyForGateway(gatewayUrl));
+      }
+      return localToken.trim();
+    }
+    if (!sessionStorage) {
       return "";
     }
-    storage.removeItem(LEGACY_TOKEN_SESSION_KEY);
-    const token = storage.getItem(tokenSessionKeyForGateway(gatewayUrl)) ?? "";
-    return token.trim();
+    sessionStorage.removeItem(LEGACY_TOKEN_SESSION_KEY);
+    const legacyToken = sessionStorage.getItem(tokenSessionKeyForGateway(gatewayUrl)) ?? "";
+    if (legacyToken.trim()) {
+      localStorage.setItem(tokenLocalKeyForGateway(gatewayUrl), legacyToken.trim());
+      sessionStorage.removeItem(tokenSessionKeyForGateway(gatewayUrl));
+      return legacyToken.trim();
+    }
+    return "";
   } catch {
     return "";
   }
 }
 
-function persistSessionToken(gatewayUrl: string, token: string) {
+function persistStoredToken(gatewayUrl: string, token: string) {
   try {
-    const storage = getSessionStorage();
-    if (!storage) {
-      return;
-    }
-    storage.removeItem(LEGACY_TOKEN_SESSION_KEY);
-    const key = tokenSessionKeyForGateway(gatewayUrl);
+    const sessionStorage = getSessionStorage();
     const normalized = token.trim();
+    const key = tokenLocalKeyForGateway(gatewayUrl);
     if (normalized) {
-      storage.setItem(key, normalized);
+      localStorage.setItem(key, normalized);
+      if (sessionStorage) {
+        sessionStorage.removeItem(LEGACY_TOKEN_SESSION_KEY);
+        sessionStorage.removeItem(tokenSessionKeyForGateway(gatewayUrl));
+      }
       return;
     }
-    storage.removeItem(key);
+    localStorage.removeItem(key);
+    if (sessionStorage) {
+      sessionStorage.removeItem(LEGACY_TOKEN_SESSION_KEY);
+      sessionStorage.removeItem(tokenSessionKeyForGateway(gatewayUrl));
+    }
   } catch {
     // best-effort
   }
@@ -124,7 +146,7 @@ export function loadSettings(): UiSettings {
 
   const defaults: UiSettings = {
     gatewayUrl: defaultUrl,
-    token: loadSessionToken(defaultUrl),
+    token: loadStoredToken(defaultUrl),
     sessionKey: "main",
     lastActiveSessionKey: "main",
     theme: "claw",
@@ -154,8 +176,7 @@ export function loadSettings(): UiSettings {
     );
     const settings = {
       gatewayUrl,
-      // Gateway auth is intentionally in-memory only; scrub any legacy persisted token on load.
-      token: loadSessionToken(gatewayUrl),
+      token: loadStoredToken(gatewayUrl),
       sessionKey:
         typeof parsed.sessionKey === "string" && parsed.sessionKey.trim()
           ? parsed.sessionKey.trim()
@@ -205,7 +226,7 @@ export function saveSettings(next: UiSettings) {
 }
 
 function persistSettings(next: UiSettings) {
-  persistSessionToken(next.gatewayUrl, next.token);
+  persistStoredToken(next.gatewayUrl, next.token);
   const persisted: PersistedUiSettings = {
     gatewayUrl: next.gatewayUrl,
     sessionKey: next.sessionKey,

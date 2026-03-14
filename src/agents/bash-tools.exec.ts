@@ -77,6 +77,51 @@ function extractScriptTargetFromCommand(
   return null;
 }
 
+function detectInlineEvalMarkdownFence(command: string): {
+  runtime: "python" | "node";
+  flag: "-c" | "--command" | "-e" | "--eval";
+} | null {
+  const raw = command.trim();
+  if (!raw.includes("```")) {
+    return null;
+  }
+
+  const pythonInlineMatch = raw.match(
+    /^\s*(python3?|python)\s+(?:-[^\s]+\s+)*(?<flag>-c|--command)\b/isu,
+  );
+  if (pythonInlineMatch?.groups?.flag === "-c" || pythonInlineMatch?.groups?.flag === "--command") {
+    return {
+      runtime: "python",
+      flag: pythonInlineMatch.groups.flag,
+    };
+  }
+
+  const nodeInlineMatch = raw.match(/^\s*node\s+(?:--[^\s]+\s+)*(?<flag>-e|--eval)\b/isu);
+  if (nodeInlineMatch?.groups?.flag === "-e" || nodeInlineMatch?.groups?.flag === "--eval") {
+    return {
+      runtime: "node",
+      flag: nodeInlineMatch.groups.flag,
+    };
+  }
+
+  return null;
+}
+
+function validateInlineEvalForMarkdownFence(command: string): void {
+  const match = detectInlineEvalMarkdownFence(command);
+  if (!match) {
+    return;
+  }
+
+  throw new Error(
+    [
+      `exec preflight: blocked ${match.runtime} ${match.flag} command containing markdown code fences.`,
+      "Shells can treat backticks inside inline eval strings as command substitution.",
+      "Use a single-quoted heredoc or write the payload to a temp file before executing it.",
+    ].join("\n"),
+  );
+}
+
 async function validateScriptFileForShellBleed(params: {
   command: string;
   workdir: string;
@@ -467,6 +512,7 @@ export function createExecTool(
 
       // Preflight: catch a common model failure mode (shell syntax leaking into Python/JS sources)
       // before we execute and burn tokens in cron loops.
+      validateInlineEvalForMarkdownFence(params.command);
       await validateScriptFileForShellBleed({ command: params.command, workdir });
 
       const run = await runExecProcess({

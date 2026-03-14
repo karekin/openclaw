@@ -71,7 +71,9 @@ export function renderOverviewCards(props: OverviewCardsProps) {
   }
 
   const totals = props.usageResult?.totals;
-  const totalCost = formatCost(totals?.totalCost);
+  const hasMissingCost =
+    totals != null && totals.totalTokens > 0 && (totals.missingCostEntries ?? 0) > 0;
+  const totalCost = hasMissingCost ? t("common.na") : formatCost(totals?.totalCost);
   const totalTokens = formatTokens(totals?.totalTokens);
   const totalMessages = totals ? String(props.usageResult?.aggregates?.messages?.total ?? 0) : "0";
   const sessionCount = props.sessionsResult?.count ?? null;

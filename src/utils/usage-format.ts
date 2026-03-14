@@ -16,6 +16,15 @@ export type UsageTotals = {
   total?: number;
 };
 
+export function hasConfiguredCostRates(cost?: ModelCostConfig | null): cost is ModelCostConfig {
+  if (!cost) {
+    return false;
+  }
+  return [cost.input, cost.output, cost.cacheRead, cost.cacheWrite].some(
+    (value) => Number.isFinite(value) && value > 0,
+  );
+}
+
 export function formatTokenCount(value?: number): string {
   if (value === undefined || !Number.isFinite(value)) {
     return "0";
@@ -72,7 +81,7 @@ export function estimateUsageCost(params: {
 }): number | undefined {
   const usage = params.usage;
   const cost = params.cost;
-  if (!usage || !cost) {
+  if (!usage || !hasConfiguredCostRates(cost)) {
     return undefined;
   }
   const input = toNumber(usage.input);

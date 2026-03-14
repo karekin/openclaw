@@ -12,7 +12,11 @@ import {
 import type { SessionEntry } from "../config/sessions/types.js";
 import { stripEnvelope, stripMessageIdHints } from "../shared/chat-envelope.js";
 import { countToolResults, extractToolCallNames } from "../utils/transcript-tools.js";
-import { estimateUsageCost, resolveModelCostConfig } from "../utils/usage-format.js";
+import {
+  estimateUsageCost,
+  hasConfiguredCostRates,
+  resolveModelCostConfig,
+} from "../utils/usage-format.js";
 import type {
   CostBreakdown,
   CostUsageTotals,
@@ -214,6 +218,19 @@ const applyCostTotal = (totals: CostUsageTotals, costTotal: number | undefined) 
   totals.totalCost += costTotal;
 };
 
+const hasZeroCostBreakdown = (costBreakdown: CostBreakdown | undefined): boolean => {
+  if (!costBreakdown) {
+    return false;
+  }
+  return (
+    costBreakdown.total === 0 &&
+    (costBreakdown.input ?? 0) === 0 &&
+    (costBreakdown.output ?? 0) === 0 &&
+    (costBreakdown.cacheRead ?? 0) === 0 &&
+    (costBreakdown.cacheWrite ?? 0) === 0
+  );
+};
+
 async function* readJsonlRecords(filePath: string): AsyncGenerator<Record<string, unknown>> {
   const fileStream = fs.createReadStream(filePath, { encoding: "utf-8" });
   const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
@@ -250,13 +267,19 @@ async function scanTranscriptFile(params: {
       continue;
     }
 
-    if (entry.usage && entry.costTotal === undefined) {
+    if (entry.usage) {
       const cost = resolveModelCostConfig({
         provider: entry.provider,
         model: entry.model,
         config: params.config,
       });
-      entry.costTotal = estimateUsageCost({ usage: entry.usage, cost });
+      if (hasZeroCostBreakdown(entry.costBreakdown) && !hasConfiguredCostRates(cost)) {
+        entry.costBreakdown = undefined;
+        entry.costTotal = undefined;
+      }
+      if (entry.costTotal === undefined) {
+        entry.costTotal = estimateUsageCost({ usage: entry.usage, cost });
+      }
     }
 
     params.onEntry(entry);
