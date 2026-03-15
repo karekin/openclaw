@@ -51,6 +51,16 @@
   opacity: 0.8;
 }
 
+.chat-text :where(img) {
+  display: block;
+  max-width: min(100%, 320px);
+  max-height: 320px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
 .chat-text :where(code) {
   font-family: var(--mono);
   font-size: 0.9em;

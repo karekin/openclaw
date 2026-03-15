@@ -6,9 +6,11 @@ import type { OpenClawApp } from "./app.ts";
 import { executeSlashCommand } from "./chat/slash-command-executor.ts";
 import { parseSlashCommand } from "./chat/slash-commands.ts";
 import { abortChatRun, loadChatHistory, sendChatMessage } from "./controllers/chat.ts";
+import { loadModels } from "./controllers/models.ts";
 import { loadSessions } from "./controllers/sessions.ts";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
 import { normalizeBasePath } from "./navigation.ts";
+import type { ModelCatalogEntry, SessionsListResult } from "./types.ts";
 import type { ChatAttachment, ChatQueueItem } from "./ui-types.ts";
 import { generateUUID } from "./uuid.ts";
 
@@ -28,6 +30,7 @@ export type ChatHost = {
   hello: GatewayHelloOk | null;
   chatAvatarUrl: string | null;
   refreshSessionsAfterChat: Set<string>;
+  sessionsResult?: SessionsListResult | null;
   /** Callback for slash-command side effects that need app-level access. */
   onSlashAction?: (action: string) => void;
 };
@@ -180,6 +183,83 @@ export function removeQueuedMessage(host: ChatHost, id: string) {
   host.chatQueue = host.chatQueue.filter((item) => item.id !== id);
 }
 
+type ChatModelRef = {
+  id: string;
+  provider?: string;
+  label: string;
+};
+
+function resolveCurrentChatModel(host: ChatHost): ChatModelRef | null {
+  const currentSession = host.sessionsResult?.sessions.find((row) => row.key === host.sessionKey);
+  const provider = currentSession?.modelProvider?.trim() || undefined;
+  const sessionModel = currentSession?.model?.trim();
+  if (sessionModel) {
+    if (provider) {
+      return { id: sessionModel, provider, label: `${provider}/${sessionModel}` };
+    }
+    const slashIndex = sessionModel.indexOf("/");
+    if (slashIndex > 0) {
+      return {
+        provider: sessionModel.slice(0, slashIndex),
+        id: sessionModel.slice(slashIndex + 1),
+        label: sessionModel,
+      };
+    }
+    return { id: sessionModel, label: sessionModel };
+  }
+
+  const defaultModel = host.sessionsResult?.defaults?.model?.trim();
+  if (!defaultModel) {
+    return null;
+  }
+  const slashIndex = defaultModel.indexOf("/");
+  if (slashIndex > 0) {
+    return {
+      provider: defaultModel.slice(0, slashIndex),
+      id: defaultModel.slice(slashIndex + 1),
+      label: defaultModel,
+    };
+  }
+  return { id: defaultModel, label: defaultModel };
+}
+
+function modelSupportsImageInput(model: ModelCatalogEntry): boolean {
+  return model.input?.includes("image") ?? false;
+}
+
+function matchesModelRef(model: ModelCatalogEntry, ref: ChatModelRef): boolean {
+  const sameId = model.id.trim().toLowerCase() === ref.id.trim().toLowerCase();
+  if (!sameId) {
+    return false;
+  }
+  if (!ref.provider) {
+    return true;
+  }
+  return model.provider.trim().toLowerCase() === ref.provider.trim().toLowerCase();
+}
+
+async function ensureAttachmentsSupported(host: ChatHost, attachments: ChatAttachment[]) {
+  if (!host.client || attachments.length === 0) {
+    return true;
+  }
+  const currentModel = resolveCurrentChatModel(host);
+  if (!currentModel) {
+    return true;
+  }
+  const models = await loadModels(host.client);
+  if (models.length === 0) {
+    return true;
+  }
+  const matched =
+    models.find((entry) => matchesModelRef(entry, currentModel)) ??
+    models.find((entry) => entry.id.trim().toLowerCase() === currentModel.id.trim().toLowerCase());
+  if (!matched || modelSupportsImageInput(matched)) {
+    return true;
+  }
+  host.lastError = `Current model (${currentModel.label}) does not support image understanding. Switch to a vision model before sending images.`;
+  return false;
+}
+
 export async function handleSendChat(
   host: ChatHost,
   messageOverride?: string,
@@ -195,6 +275,9 @@ export async function handleSendChat(
   const hasAttachments = attachmentsToSend.length > 0;
 
   if (!message && !hasAttachments) {
+    return;
+  }
+  if (!(await ensureAttachmentsSupported(host, attachmentsToSend))) {
     return;
   }
 

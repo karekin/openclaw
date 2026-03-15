@@ -1,3 +1,6 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   buildMessageWithAttachments,
@@ -136,6 +139,59 @@ describe("parseMessageWithAttachments", () => {
     expect(parsed.images[0]?.mimeType).toBe("image/png");
     expect(parsed.images[0]?.data).toBe(PNG_1x1);
     expect(logs.some((l) => /non-image/i.test(l))).toBe(true);
+  });
+
+  it("materializes image attachments to local file paths for downstream tools", async () => {
+    const parsed = await parseMessageWithAttachments(
+      "import this into siyuan",
+      [
+        {
+          type: "image",
+          mimeType: "image/png",
+          fileName: "dot.png",
+          content: PNG_1x1,
+        },
+      ],
+      { log: { warn: () => {} }, materializeFilePaths: true },
+    );
+
+    expect(parsed.images).toHaveLength(1);
+    expect(parsed.message).toContain("Chat attachment file paths");
+    expect(parsed.message).toContain("do not call `image` just to re-read them");
+    const match = parsed.message.match(/\[Image: source: ([^\]]+)\]/);
+    expect(match?.[1]).toBeTruthy();
+    const materializedPath = match?.[1] ?? "";
+    expect(materializedPath.endsWith(".png")).toBe(true);
+    const bytes = await fs.readFile(materializedPath);
+    expect(bytes.length).toBeGreaterThan(0);
+    await fs.rm(path.dirname(materializedPath), { recursive: true, force: true });
+  });
+
+  it("cleans up expired materialized attachment directories on the next write", async () => {
+    const rootDir = path.join(os.tmpdir(), "openclaw-chat-attachments");
+    const staleDir = await fs.mkdtemp(path.join(rootDir, "att-stale-"));
+    const staleFile = path.join(staleDir, "old.png");
+    await fs.writeFile(staleFile, Buffer.from(PNG_1x1, "base64"));
+    const staleTime = new Date(Date.now() - 7 * 60 * 60 * 1000);
+    await fs.utimes(staleDir, staleTime, staleTime);
+
+    const parsed = await parseMessageWithAttachments(
+      "import this into siyuan",
+      [
+        {
+          type: "image",
+          mimeType: "image/png",
+          fileName: "fresh.png",
+          content: PNG_1x1,
+        },
+      ],
+      { log: { warn: () => {} }, materializeFilePaths: true },
+    );
+
+    const freshMatch = parsed.message.match(/\[Image: source: ([^\]]+)\]/);
+    expect(freshMatch?.[1]).toBeTruthy();
+    await expect(fs.stat(staleDir)).rejects.toThrow();
+    await fs.rm(path.dirname(freshMatch?.[1] ?? ""), { recursive: true, force: true });
   });
 });
 

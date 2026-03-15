@@ -295,7 +295,7 @@ export function createImageTool(options?: {
   // If model has native vision, images in the prompt are auto-injected
   // so this tool is only needed when image wasn't provided in the prompt
   const description = options?.modelHasVision
-    ? "Analyze one or more images with a vision model. Use image for a single path/URL, or images for multiple (up to 20). Only use this tool when images were NOT already provided in the user's message. Images mentioned in the prompt are automatically visible to you."
+    ? "Analyze one or more images with a vision model. Use image for a single path/URL, or images for multiple (up to 20). Never use this tool to re-analyze images that were already attached in the user's message because those images are already visible in the model context. Use it only for external or local images that are not already in context."
     : "Analyze one or more images with the configured image model (agents.defaults.imageModel). Use image for a single path/URL, or images for multiple (up to 20). Provide a prompt describing what to analyze.";
 
   const localRoots = resolveMediaToolLocalRoots(options?.workspaceDir, {

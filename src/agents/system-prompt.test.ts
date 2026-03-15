@@ -145,6 +145,9 @@ describe("buildAgentSystemPrompt", () => {
     expect(prompt).toContain("## Skills (mandatory)");
     expect(prompt).toContain("<available_skills>");
     expect(prompt).toContain(
+      "When the user provides an attachment, URL, or local file, prefer the skill whose description explicitly names that source type over a broader write/save skill.",
+    );
+    expect(prompt).toContain(
       "When a skill drives external API writes, assume rate limits: prefer fewer larger writes, avoid tight one-item loops, serialize bursts when possible, and respect 429/Retry-After.",
     );
   });

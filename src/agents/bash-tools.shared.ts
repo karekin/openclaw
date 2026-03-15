@@ -92,11 +92,12 @@ export async function resolveSandboxWorkdir(params: {
   warnings: string[];
 }) {
   const fallback = params.sandbox.workspaceDir;
+  const expandedWorkdir = expandHomeWorkdir(params.workdir);
   const mappedHostWorkdir = mapContainerWorkdirToHost({
-    workdir: params.workdir,
+    workdir: expandedWorkdir,
     sandbox: params.sandbox,
   });
-  const candidateWorkdir = mappedHostWorkdir ?? params.workdir;
+  const candidateWorkdir = mappedHostWorkdir ?? expandedWorkdir;
   try {
     const resolved = await assertSandboxPath({
       filePath: candidateWorkdir,
@@ -158,16 +159,27 @@ function normalizeContainerPath(input: string): string {
 export function resolveWorkdir(workdir: string, warnings: string[]) {
   const current = safeCwd();
   const fallback = current ?? homedir();
+  const expandedWorkdir = expandHomeWorkdir(workdir);
   try {
-    const stats = statSync(workdir);
+    const stats = statSync(expandedWorkdir);
     if (stats.isDirectory()) {
-      return workdir;
+      return expandedWorkdir;
     }
   } catch {
     // ignore, fallback below
   }
   warnings.push(`Warning: workdir "${workdir}" is unavailable; using "${fallback}".`);
   return fallback;
+}
+
+function expandHomeWorkdir(workdir: string) {
+  if (workdir === "~") {
+    return homedir();
+  }
+  if (workdir.startsWith("~/")) {
+    return path.join(homedir(), workdir.slice(2));
+  }
+  return workdir;
 }
 
 function safeCwd() {

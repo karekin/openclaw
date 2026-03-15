@@ -192,6 +192,17 @@ what is this?`;
     expect(refs).toHaveLength(1);
     expect(refs[0]?.resolved).toContain("ChatGPT Image Apr 21, 2025.png");
   });
+
+  it("ignores image paths inside internal attachment path blocks", () => {
+    const prompt = `Use this file for tooling only.
+<openclaw_attachment_paths>
+Chat attachment file paths (use these directly for tools/scripts; do not call \`write\` just to save the attachment first):
+[Image: source: /tmp/openclaw-chat-attachments/att-123/demo.png]
+</openclaw_attachment_paths>`;
+    const refs = detectImageReferences(prompt);
+
+    expect(refs).toHaveLength(0);
+  });
 });
 
 describe("modelSupportsImages", () => {

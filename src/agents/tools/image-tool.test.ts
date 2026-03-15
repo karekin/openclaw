@@ -388,7 +388,7 @@ describe("image tool implicit imageModel config", () => {
       const tool = createImageTool({ config: cfg, agentDir, modelHasVision: true });
       expect(tool).not.toBeNull();
       expect(tool?.description).toContain(
-        "Only use this tool when images were NOT already provided",
+        "Never use this tool to re-analyze images that were already attached",
       );
     });
   });
